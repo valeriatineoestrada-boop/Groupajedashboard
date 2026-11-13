@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Gerencial T3 — AJE Group (Administración de Operaciones)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        aje: {
+                            navy: '#0B2A5B',
+                            slate: '#1E293B',
+                            red: '#D32F2F',
+                            darkred: '#B71C1C',
+                            orange: '#F26B21',
+                            emerald: '#059669'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #F1F5F9; color: #0F172A; }
+        .editable-cell { transition: all 0.15s ease; }
+        .editable-cell:focus { outline: 2px solid #D32F2F; background-color: #FEF2F2; }
+        
+        /* Modo Vista Limpia para capturas de Word */
+        body.clean-mode .no-clean { display: none !important; }
+        body.clean-mode .editable-cell {
+            border-color: transparent !important;
+            background-color: transparent !important;
+            pointer-events: none;
+            -moz-appearance: textfield;
+        }
+        body.clean-mode .editable-cell::-webkit-inner-spin-button,
+        body.clean-mode .editable-cell::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        body.clean-mode .table-scroll-box {
+            max-height: none !important;
+            overflow: visible !important;
+        }
+
+        @media print {
+            body { background-color: #FFFFFF !important; -webkit-print-color-adjust: exact !important; }
+            .no-clean { display: none !important; }
+            .print-break { page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col">
+
+    <!-- ENCABEZADO CORPORATIVO -->
+    <header class="bg-aje-navy text-white shadow-lg border-b-4 border-aje-red">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div class="flex items-center gap-4">
+                <div class="bg-aje-red text-white font-extrabold text-xl px-4 py-2 rounded-lg tracking-wider shadow-md flex items-center gap-2">
+                    <i class="fa-solid fa-truck-fast"></i>
+                    <span>AJE</span>
+                </div>
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h1 class="text-lg sm:text-xl font-bold tracking-tight text-white">
+                            Dashboard de Gestión Logística y Proyección S&OP
+                        </h1>
+                        <span class="bg-blue-900/80 text-amber-300 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-blue-700">
+                            Evaluación T3
+                        </span>
+                    </div>
+                    <p class="text-xs sm:text-sm text-slate-300 mt-0.5">
+                        Administración de Operaciones • Proceso de Distribución (Lima Metropolitana) • UPN
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2.5">
+                <button id="btnReset" onclick="resetDefaultData()" class="no-clean bg-blue-900/70 hover:bg-blue-800 text-slate-100 text-xs font-medium px-3.5 py-2 rounded-lg border border-blue-700 transition flex items-center gap-1.5 shadow-sm cursor-pointer">
+                    <i class="fa-solid fa-rotate-left text-amber-400"></i>
+                    Restaurar datos
+                </button>
+                <button id="btnCleanMode" onclick="toggleCleanMode()" class="bg-aje-red hover:bg-aje-darkred text-white text-xs font-semibold px-4 py-2 rounded-lg transition flex items-center gap-1.5 shadow-md cursor-pointer">
+                    <i class="fa-solid fa-camera"></i>
+                    <span id="cleanBtnText">Vista Limpia / Captura Word</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- CONTROLES SUPERIORES LIMPIOS (2 SELECTORES PRINCIPALES) -->
+        <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 print-break">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-3 mb-4 border-b border-slate-100">
+                <div>
+                    <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-sliders text-aje-red"></i>
+                        Parámetros de Simulación y Pronóstico (Propuesta T2 — Cutoff Time 18:00h y S&OP)
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Selecciona el escenario operativo y el modelo cuantitativo de proyección del indicador OTIF.
+                    </p>
+                </div>
+                <span id="scenarioBadge" class="text-xs font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">
+                    Escenario TO BE Activo (100% Mejora T2)
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <!-- Selector 1: Escenario Operativo -->
+                <div class="bg-slate-50 p-3.5 rounded-lg border border-slate-200">
+                    <label for="scenarioSelect" class="block text-xs font-bold text-slate-700 mb-1.5">
+                        1. Escenario Operativo de Distribución
+                    </label>
+                    <select id="scenarioSelect" onchange="recalculateAll()" class="w-full text-sm font-semibold text-slate-800 bg-white border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:border-aje-red cursor-pointer">
+                        <option value="0">Escenario Actual (AS IS - Sin mejora / 0% adopción)</option>
+                        <option value="0.5">Escenario Intermedio (Transición / 50% adopción)</option>
+                        <option value="1" selected>Escenario Mejorado (TO BE - 100% propuesta T2)</option>
+                    </select>
+                    <p id="scenarioDesc" class="text-[11px] text-slate-500 mt-1.5">
+                        Implementación total de horas de corte (18:00h), listas de verificación y tablero S&OP compartido.
+                    </p>
+                </div>
+
+                <!-- Selector 2: Modelo de Pronóstico OTIF -->
+                <div class="bg-slate-50 p-3.5 rounded-lg border border-slate-200">
+                    <label for="modelSelect" class="block text-xs font-bold text-slate-700 mb-1.5">
+                        2. Modelo de Pronóstico Cuantitativo (OTIF)
+                    </label>
+                    <select id="modelSelect" onchange="recalculateAll()" class="w-full text-sm font-semibold text-slate-800 bg-white border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:border-aje-red cursor-pointer">
+                        <option value="lin" selected>Tendencia Lineal (y = 1.2378x + 76.121) — Óptimo</option>
+                        <option value="ma3">Promedio Móvil (3 semanas)</option>
+                        <option value="ma4">Promedio Móvil (4 semanas)</option>
+                    </select>
+                    <p id="modelDesc" class="text-[11px] text-emerald-700 font-medium mt-1.5">
+                        Modelo seleccionado con menor Error Cuadrático Medio (ECM = 2.17) y DAM = 1.31%.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4 TARJETAS KPI PRINCIPALES (VARIABLES CLAVE PUNTO 2) -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 print-break">
+            <!-- KPI 1: Tiempo de retraso en despachos -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 border-t-4 border-t-aje-red p-5 flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-start">
+                        <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Tiempo de retraso en despachos</p>
+                        <span class="p-2 bg-red-50 text-aje-red rounded-lg"><i class="fa-regular fa-clock"></i></span>
+                    </div>
+                    <div class="flex items-baseline gap-2 mt-2">
+                        <h3 id="kpiDelayVal" class="text-3xl font-extrabold text-slate-900">0.45 h</h3>
+                        <span id="kpiDelayStatus" class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Cumple &lt; 0.50 h</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-1">Actual: <strong>3.5 – 5.0 h</strong> (prom. 4.25 h) → Meta: <strong>&lt; 0.50 h</strong></p>
+                </div>
+                <div class="mt-4">
+                    <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                        <div id="kpiDelayBar" class="bg-aje-red h-full transition-all duration-300" style="width: 100%"></div>
+                    </div>
+                    <p id="kpiDelayNote" class="text-[11px] font-semibold text-emerald-700 mt-2">Reducción de 3.80 horas (-89.4%) por salida a tiempo</p>
+                </div>
+            </div>
+
+            <!-- KPI 2: Ocupación de capacidad de carga -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 border-t-4 border-t-aje-navy p-5 flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-start">
+                        <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Ocupación de capacidad de carga</p>
+                        <span class="p-2 bg-blue-50 text-aje-navy rounded-lg"><i class="fa-solid fa-truck-ramp-box"></i></span>
+                    </div>
+                    <div class="flex items-baseline gap-2 mt-2">
+                        <h3 id="kpiFleetVal" class="text-3xl font-extrabold text-slate-900">91.5%</h3>
+                        <span id="kpiFleetStatus" class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Meta 90–92%</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-1">Actual: <strong>70% – 75%</strong> (prom. 72.5%) → Meta: <strong>90% – 92%</strong></p>
+                </div>
+                <div class="mt-4">
+                    <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                        <div id="kpiFleetBar" class="bg-aje-navy h-full transition-all duration-300" style="width: 100%"></div>
+                    </div>
+                    <p id="kpiFleetNote" class="text-[11px] font-semibold text-emerald-700 mt-2">+19.0 pts de aprovechamiento de flota consolidada</p>
+                </div>
+            </div>
+
+            <!-- KPI 3: Nivel de cumplimiento OTIF -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 border-t-4 border-t-aje-orange p-5 flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-start">
+                        <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Nivel de cumplimiento OTIF</p>
+                        <span class="p-2 bg-orange-50 text-aje-orange rounded-lg"><i class="fa-solid fa-clipboard-check"></i></span>
+                    </div>
+                    <div class="flex items-baseline gap-2 mt-2">
+                        <h3 id="kpiOtifVal" class="text-3xl font-extrabold text-slate-900">92.0%</h3>
+                        <span id="kpiOtifStatus" class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Meta 92.0%</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-1">Actual: <strong>80.0%</strong> → Meta proyectada: <strong>92.0%</strong></p>
+                </div>
+                <div class="mt-4">
+                    <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                        <div id="kpiOtifBar" class="bg-aje-orange h-full transition-all duration-300" style="width: 100%"></div>
+                    </div>
+                    <p id="kpiOtifNote" class="text-[11px] font-semibold text-emerald-700 mt-2">+12.0 pts en pedidos entregados a tiempo y completos</p>
+                </div>
+            </div>
+
+            <!-- KPI 4: Costo logístico sobre ventas -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 border-t-4 border-t-emerald-600 p-5 flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-start">
+                        <p class="text-xs font-bold uppercase tracking-wider text-slate-500">Costo logístico sobre ventas</p>
+                        <span class="p-2 bg-emerald-50 text-emerald-700 rounded-lg"><i class="fa-solid fa-sack-dollar"></i></span>
+                    </div>
+                    <div class="flex items-baseline gap-2 mt-2">
+                        <h3 id="kpiCostVal" class="text-3xl font-extrabold text-slate-900">8.50%</h3>
+                        <span id="kpiCostStatus" class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Meta 8.50%</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-1">Actual: <strong>10.00%</strong> → Meta proyectada: <strong>8.50%</strong></p>
+                </div>
+                <div class="mt-4">
+                    <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                        <div id="kpiCostBar" class="bg-emerald-600 h-full transition-all duration-300" style="width: 100%"></div>
+                    </div>
+                    <p id="kpiCostNote" class="text-[11px] font-semibold text-emerald-700 mt-2">Ahorro mensual: S/ 750,000 (sobre ventas S/ 50M)</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN DE GRÁFICOS PRINCIPALES -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6 print-break">
+            <!-- Gráfico 1: Proyección Cuantitativa del OTIF (12 Semanas + S13) -->
+            <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-800">Proyección Cuantitativa del OTIF (Semanas 1 – 12 y Pronóstico S13)</h3>
+                        <p id="otifChartSubtitle" class="text-xs text-slate-500">Modelo activo: Tendencia Lineal • ECM: 2.17 • DAM: 1.31%</p>
+                    </div>
+                    <span id="equationBadge" class="bg-blue-50 text-aje-navy font-mono text-xs font-bold px-3 py-1 rounded-lg border border-blue-200">
+                        y = 1.2378x + 76.121
+                    </span>
+                </div>
+                <div class="relative h-72 w-full">
+                    <canvas id="otifChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Gráfico 2: Comparativa de Escenarios AS IS vs TO BE -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-slate-800">Comparativa: AS IS vs. TO BE</h3>
+                    <p class="text-xs text-slate-500 mb-3">Impacto operativo y eficiencia de costos (Punto 4)</p>
+                </div>
+                <div class="relative h-72 w-full">
+                    <canvas id="scenarioChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- GRÁFICO 3 Y TABLA COMPARATIVA DE MODELOS -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-6 print-break">
+            <!-- Gráfico 3: Evolución de Reducción de Retrasos en Despacho -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-800">Evolución de Reducción de Retrasos en Despacho (Horas)</h3>
+                        <p class="text-xs text-slate-500">Efecto progresivo de Cutoff Time (18:00h), Checklists y S&OP (Sem 1 – 12)</p>
+                    </div>
+                    <span class="bg-emerald-50 text-emerald-700 text-xs font-bold px-2.5 py-1 rounded border border-emerald-200">
+                        Meta &lt; 0.50 h
+                    </span>
+                </div>
+                <div class="relative h-64 w-full">
+                    <canvas id="delayChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Tabla Comparativa de Modelos de Pronóstico -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-square-root-variable text-aje-red"></i>
+                        Comparación de Modelos de Pronóstico (Cálculo de Errores)
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-0.5 mb-3">
+                        Evaluación estadística mediante Error Cuadrático Medio (ECM) y Desviación Absoluta Media (DAM).
+                    </p>
+
+                    <div class="overflow-x-auto rounded-lg border border-slate-200">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-aje-navy text-white">
+                                    <th class="py-2.5 px-3 font-semibold">Modelo Evaluado</th>
+                                    <th class="py-2.5 px-3 font-semibold text-center">ECM (En vivo)</th>
+                                    <th class="py-2.5 px-3 font-semibold text-center">DAM % (En vivo)</th>
+                                    <th class="py-2.5 px-3 font-semibold text-center">Estado / Ajuste</th>
+                                </tr>
+                            </thead>
+                            <tbody id="modelsComparisonBody" class="divide-y divide-slate-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="mt-4 p-3.5 rounded-lg bg-emerald-50/80 border border-emerald-200">
+                    <p id="modelJustificationText" class="text-xs text-slate-700 leading-relaxed">
+                        <strong class="text-emerald-900"><i class="fa-solid fa-circle-check text-emerald-600 mr-1"></i>Sustento Técnico T3:</strong> La <strong>Tendencia Lineal (y = 1.2378x + 76.121)</strong> obtiene los menores indicadores de error (<strong>ECM = 2.17</strong> y <strong>DAM = 1.31%</strong>) frente a los promedios móviles, demostrando que la mejora del OTIF hacia el 92% responde a una progresión sostenida tras estandarizar los flujos.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- TABLA DINÁMICA EDITABLE DE 12 SEMANAS + PRONÓSTICO S13 -->
+        <section class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print-break">
+            <div class="p-5 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-50">
+                <div>
+                    <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-table text-aje-red"></i>
+                        Matriz de Proyección Semanal (Semanas 1 – 12 y Pronóstico Semana 13)
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-0.5 no-clean">
+                        Puedes modificar los valores en las celdas con borde punteado para simular cambios; los gráficos y errores ECM/DAM se actualizan automáticamente.
+                    </p>
+                </div>
+                <span class="no-clean text-xs font-semibold text-aje-red bg-red-50 px-3 py-1 rounded-full border border-red-200">
+                    <i class="fa-solid fa-pen-to-square mr-1"></i> Celdas Editables
+                </span>
+            </div>
+
+            <div class="overflow-x-auto max-h-[30rem] overflow-y-auto table-scroll-box">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead class="sticky top-0 z-10">
+                        <tr class="bg-aje-navy text-white uppercase tracking-wider text-[11px]">
+                            <th class="py-3 px-3 font-semibold text-center">Semana</th>
+                            <th class="py-3 px-4 font-semibold">Etapa / Hito Operativo T2</th>
+                            <th class="py-3 px-3 font-semibold text-center bg-blue-900">OTIF Real/Sim (%)</th>
+                            <th class="py-3 px-3 font-semibold text-center">Pronóstico (%)</th>
+                            <th class="py-3 px-3 font-semibold text-center">Error (e)</th>
+                            <th class="py-3 px-3 font-semibold text-center">Error²</th>
+                            <th class="py-3 px-3 font-semibold text-center">|Error|</th>
+                            <th class="py-3 px-3 font-semibold text-center bg-blue-900">Retraso (h)</th>
+                            <th class="py-3 px-3 font-semibold text-center">Estado Meta</th>
+                        </tr>
+                    </thead>
+                    <tbody id="weeklyTableBody" class="divide-y divide-slate-200 text-slate-700"></tbody>
+                    <tfoot class="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300">
+                        <tr>
+                            <td colspan="5" class="py-2.5 px-4 text-right">Indicadores de Error del Modelo Seleccionado (ECM / DAM):</td>
+                            <td id="footEcm" class="py-2.5 px-3 text-center text-aje-navy">2.17</td>
+                            <td id="footDam" class="py-2.5 px-3 text-center text-aje-navy">1.31%</td>
+                            <td colspan="2" class="py-2.5 px-3 text-center text-emerald-700">Meta S12 Alcanzada</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- PIE DE PÁGINA -->
+    <footer class="bg-white border-t border-slate-200 py-4 mt-6">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center text-xs text-slate-500 gap-2">
+            <div><strong>Caso de Estudio: AJE Group</strong> • Evaluación T3 — Administración de Operaciones (UPN)</div>
+            <div>Datos proyectados según diagnóstico AS IS y propuesta de mejora TO BE (T2)</div>
+        </div>
+    </footer>
+
+    <!-- LÓGICA DE CÁLCULO Y GRÁFICOS -->
+    <script>
+        // Datos base exactos del informe T3
+        const INITIAL_DATA = [
+            { week: 1,  milestone: 'Línea base AS IS (Descoordinación áreas)', otif: 79.00, delay: 4.50 },
+            { week: 2,  milestone: 'Línea base AS IS (Cambios última hora)',   otif: 80.50, delay: 4.30 },
+            { week: 3,  milestone: 'Línea base AS IS (Subutilización flota)',  otif: 79.50, delay: 4.10 },
+            { week: 4,  milestone: 'Implementación Cutoff Time (18:00h)',      otif: 81.00, delay: 3.40 },
+            { week: 5,  milestone: 'Aplicación Checklists en Almacén',         otif: 80.00, delay: 2.80 },
+            { week: 6,  milestone: 'Protocolo comunicación Ventas-Logística',  otif: 82.00, delay: 2.20 },
+            { week: 7,  milestone: 'Despliegue Tablero S&OP compartido',       otif: 84.50, delay: 1.70 },
+            { week: 8,  milestone: 'Consolidación de pedidos por ruta',        otif: 84.50, delay: 1.25 },
+            { week: 9,  milestone: 'Sincronización de ventanas de carga',      otif: 85.50, delay: 0.90 },
+            { week: 10, milestone: 'Optimización ocupación flota (90%+)',      otif: 90.00, delay: 0.65 },
+            { week: 11, milestone: 'Estabilización operativa de despachos',    otif: 91.50, delay: 0.48 },
+            { week: 12, milestone: 'Cumplimiento integral TO BE (Meta T2)',    otif: 92.00, delay: 0.40 }
+        ];
+
+        let stateData = JSON.parse(JSON.stringify(INITIAL_DATA));
+        let otifChart = null;
+        let scenarioChart = null;
+        let delayChart = null;
+
+        const MONTHLY_SALES = 50000000; // S/ 50,000,000 base mensual
+
+        window.onload = function () {
+            initCharts();
+            recalculateAll();
+        };
+
+        function toggleCleanMode() {
+            const isClean = document.body.classList.toggle('clean-mode');
+            document.getElementById('cleanBtnText').textContent = isClean
+                ? 'Salir de Vista Limpia'
+                : 'Vista Limpia / Captura Word';
+        }
+
+        function resetDefaultData() {
+            stateData = JSON.parse(JSON.stringify(INITIAL_DATA));
+            document.getElementById('scenarioSelect').value = '1';
+            document.getElementById('modelSelect').value = 'lin';
+            recalculateAll();
+        }
+
+        function updateRowValue(index, field, val) {
+            const num = parseFloat(val);
+            if (isNaN(num)) return;
+            if (field === 'otif') {
+                stateData[index].otif = Math.min(100, Math.max(0, num));
+            } else if (field === 'delay') {
+                stateData[index].delay = Math.min(24, Math.max(0, num));
+            }
+            recalculateAll();
+        }
+
+        // Cálculo de pronósticos: Tendencia Lineal, Promedio Móvil 3 y 4 semanas
+        function computeForecast(modelType, series) {
+            const n = series.length;
+            const preds = new Array(n + 1).fill(null); // Incluye Semana 13
+            let equation = '';
+
+            if (modelType === 'lin') {
+                let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+                for (let i = 0; i < n; i++) {
+                    const x = i + 1;
+                    const y = series[i];
+                    sumX += x;
+                    sumY += y;
+                    sumXY += x * y;
+                    sumX2 += x * x;
+                }
+                const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+                const intercept = (sumY - slope * sumX) / n;
+                for (let i = 0; i <= n; i++) {
+                    preds[i] = slope * (i + 1) + intercept;
+                }
+                equation = `y = ${slope.toFixed(4)}x + ${intercept.toFixed(3)}`;
+            } else {
+                const k = modelType === 'ma3' ? 3 : 4;
+                for (let i = k; i <= n; i++) {
+                    let sum = 0;
+                    for (let j = i - k; j < i; j++) {
+                        sum += series[j];
+                    }
+                    preds[i] = sum / k;
+                }
+            }
+
+            let sqErrSum = 0;
+            let absErrSum = 0;
+            let count = 0;
+
+            for (let i = 0; i < n; i++) {
+                if (preds[i] !== null) {
+                    const err = series[i] - preds[i];
+                    sqErrSum += err * err;
+                    absErrSum += Math.abs(err);
+                    count++;
+                }
+            }
+
+            return {
+                preds,
+                equation,
+                ecm: count > 0 ? sqErrSum / count : 0,
+                dam: count > 0 ? absErrSum / count : 0
+            };
+        }
+
+        function recalculateAll() {
+            const adoption = parseFloat(document.getElementById('scenarioSelect').value);
+            const selectedModel = document.getElementById('modelSelect').value;
+            const otifSeries = stateData.map(d => d.otif);
+
+            // Calcular los 3 modelos
+            const resLin = computeForecast('lin', otifSeries);
+            const resMa3 = computeForecast('ma3', otifSeries);
+            const resMa4 = computeForecast('ma4', otifSeries);
+
+            const activeRes = selectedModel === 'lin' ? resLin : (selectedModel === 'ma3' ? resMa3 : resMa4);
+
+            // Actualizar textos de cabecera y selectores
+            document.getElementById('equationBadge').textContent = resLin.equation;
+            document.getElementById('otifChartSubtitle').textContent =
+                `Modelo activo: ${selectedModel === 'lin' ? 'Tendencia Lineal' : selectedModel === 'ma3' ? 'Promedio Móvil (3 sem)' : 'Promedio Móvil (4 sem)'} • ECM: ${activeRes.ecm.toFixed(2)} • DAM: ${activeRes.dam.toFixed(2)}% • Pronóstico S13: ${activeRes.preds[12].toFixed(2)}%`;
+
+            const badge = document.getElementById('scenarioBadge');
+            const scDesc = document.getElementById('scenarioDesc');
+            if (adoption === 1) {
+                badge.textContent = 'Escenario TO BE Activo (100% Mejora T2)';
+                badge.className = 'text-xs font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800';
+                scDesc.textContent = 'Implementación total de horas de corte (18:00h), listas de verificación y tablero S&OP compartido.';
+            } else if (adoption === 0.5) {
+                badge.textContent = 'Escenario Intermedio (50% Adopción)';
+                badge.className = 'text-xs font-bold px-3 py-1 rounded-full bg-amber-100 text-amber-800';
+                scDesc.textContent = 'Implementación parcial en rutas principales; reducción progresiva de tiempos muertos en almacén.';
+            } else {
+                badge.textContent = 'Escenario Actual AS IS (0% Mejora)';
+                badge.className = 'text-xs font-bold px-3 py-1 rounded-full bg-red-100 text-aje-red';
+                scDesc.textContent = 'Operación fragmentada sin horas de corte; persisten retrasos de 3.5 a 5.0 h y sobrecostos.';
+            }
+
+            // Actualizar 4 KPIs principales (interpolados según escenario seleccionado)
+            const targetDelay = Math.min(0.45, stateData[11].delay + 0.05); // 0.45 h en TO BE por defecto
+            const currentDelay = 4.25 - adoption * (4.25 - 0.45);
+            const currentFleet = 72.5 + adoption * (91.5 - 72.5);
+            const targetOtif = stateData[11].otif;
+            const currentOtif = 80.0 + adoption * (targetOtif - 80.0);
+            const currentCost = 10.0 - adoption * (10.0 - 8.5);
+            const monthlySavings = MONTHLY_SALES * ((10.0 - currentCost) / 100);
+
+            // KPI 1: Retraso
+            document.getElementById('kpiDelayVal').textContent = currentDelay.toFixed(2) + ' h';
+            document.getElementById('kpiDelayBar').style.width = (adoption * 100) + '%';
+            const delayStatus = document.getElementById('kpiDelayStatus');
+            if (currentDelay < 0.5) {
+                delayStatus.textContent = 'Cumple < 0.50 h';
+                delayStatus.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800';
+                document.getElementById('kpiDelayNote').textContent = `Reducción de ${(4.25 - currentDelay).toFixed(2)} horas (-89.4%) por salida a tiempo`;
+                document.getElementById('kpiDelayNote').className = 'text-[11px] font-semibold text-emerald-700 mt-2';
+            } else {
+                delayStatus.textContent = adoption === 0 ? 'Crítico AS IS' : 'En transición';
+                delayStatus.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-aje-red';
+                document.getElementById('kpiDelayNote').textContent = adoption === 0 ? 'Cuello de botella por cambios de última hora' : `Reducción parcial de ${(4.25 - currentDelay).toFixed(2)} horas`;
+                document.getElementById('kpiDelayNote').className = 'text-[11px] font-semibold text-aje-red mt-2';
+            }
+
+            // KPI 2: Flota
+            document.getElementById('kpiFleetVal').textContent = currentFleet.toFixed(1) + '%';
+            document.getElementById('kpiFleetBar').style.width = (adoption * 100) + '%';
+            const fleetStatus = document.getElementById('kpiFleetStatus');
+            fleetStatus.textContent = currentFleet >= 90 ? 'Meta 90–92%' : (adoption === 0 ? 'Subutilizada' : 'En mejora');
+            fleetStatus.className = currentFleet >= 90
+                ? 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800'
+                : 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800';
+            document.getElementById('kpiFleetNote').textContent = adoption === 0
+                ? 'Falta de consolidación oportuna de pedidos'
+                : `+${(currentFleet - 72.5).toFixed(1)} pts de aprovechamiento de flota consolidada`;
+
+            // KPI 3: OTIF
+            document.getElementById('kpiOtifVal').textContent = currentOtif.toFixed(1) + '%';
+            document.getElementById('kpiOtifBar').style.width = (adoption * 100) + '%';
+            const otifStatus = document.getElementById('kpiOtifStatus');
+            otifStatus.textContent = currentOtif >= 92 ? 'Meta 92.0%' : (adoption === 0 ? 'Base 80.0%' : 'En progreso');
+            otifStatus.className = currentOtif >= 92
+                ? 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800'
+                : 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800';
+            document.getElementById('kpiOtifNote').textContent = adoption === 0
+                ? '20% de pedidos con retrasos o devoluciones'
+                : `+${(currentOtif - 80.0).toFixed(1)} pts en pedidos entregados a tiempo y completos`;
+
+            // KPI 4: Costo
+            document.getElementById('kpiCostVal').textContent = currentCost.toFixed(2) + '%';
+            document.getElementById('kpiCostBar').style.width = (adoption * 100) + '%';
+            const costStatus = document.getElementById('kpiCostStatus');
+            costStatus.textContent = currentCost <= 8.5 ? 'Meta 8.50%' : (adoption === 0 ? 'Sobrecosto 10%' : 'Optimizando');
+            costStatus.className = currentCost <= 8.5
+                ? 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800'
+                : 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-aje-red';
+            document.getElementById('kpiCostNote').textContent = adoption === 0
+                ? 'Gasto logístico: S/ 5,000,000 / mes (sin ahorro)'
+                : `Ahorro mensual: S/ ${Math.round(monthlySavings).toLocaleString('es-PE')} (sobre ventas S/ 50M)`;
+
+            // Renderizar tabla comparativa de modelos
+            const modelsList = [
+                { id: 'lin', name: 'Tendencia Lineal', res: resLin, tag: 'Óptimo (Menor Error)', isBest: true },
+                { id: 'ma3', name: 'Promedio Móvil (3 sem)', res: resMa3, tag: 'Referencial', isBest: false },
+                { id: 'ma4', name: 'Promedio Móvil (4 sem)', res: resMa4, tag: 'Mayor rezago', isBest: false }
+            ];
+
+            const cmpBody = document.getElementById('modelsComparisonBody');
+            cmpBody.innerHTML = modelsList.map(m => {
+                const isSelected = m.id === selectedModel;
+                return `
+                    <tr class="${isSelected ? 'bg-blue-50/80 font-bold' : 'hover:bg-slate-50'}">
+                        <td class="py-2.5 px-3 text-slate-800">${m.name}</td>
+                        <td class="py-2.5 px-3 text-center font-mono ${m.isBest ? 'text-emerald-700 font-bold' : 'text-slate-700'}">${m.res.ecm.toFixed(2)}</td>
+                        <td class="py-2.5 px-3 text-center font-mono ${m.isBest ? 'text-emerald-700 font-bold' : 'text-slate-700'}">${m.res.dam.toFixed(2)}%</td>
+                        <td class="py-2.5 px-3 text-center">
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${m.isBest ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}">
+                                ${m.tag}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Renderizar tabla semanal (12 semanas + S13)
+            const tbody = document.getElementById('weeklyTableBody');
+            tbody.innerHTML = '';
+
+            stateData.forEach((row, i) => {
+                const pred = activeRes.preds[i];
+                const err = pred !== null ? (row.otif - pred) : null;
+                const errSq = err !== null ? (err * err) : null;
+                const absErr = err !== null ? Math.abs(err) : null;
+                const isGoalMet = row.otif >= 92.0 && row.delay <= 0.50;
+
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition';
+                tr.innerHTML = `
+                    <td class="py-2 px-3 text-center font-bold text-slate-800">Sem ${row.week}</td>
+                    <td class="py-2 px-4 text-slate-600">${row.milestone}</td>
+                    <td class="py-2 px-3 text-center bg-blue-50/40">
+                        <input type="number" step="0.1" min="0" max="100" value="${row.otif.toFixed(2)}"
+                            onchange="updateRowValue(${i}, 'otif', this.value)"
+                            class="editable-cell w-20 text-center font-bold text-slate-900 bg-white border border-dashed border-aje-red/60 rounded px-1.5 py-1">
+                    </td>
+                    <td class="py-2 px-3 text-center font-semibold text-aje-navy">${pred !== null ? pred.toFixed(2) + '%' : '—'}</td>
+                    <td class="py-2 px-3 text-center font-mono ${err === null ? 'text-slate-400' : (err >= 0 ? 'text-emerald-600' : 'text-rose-600')}">
+                        ${err !== null ? (err >= 0 ? '+' : '') + err.toFixed(2) : '—'}
+                    </td>
+                    <td class="py-2 px-3 text-center font-mono text-slate-600">${errSq !== null ? errSq.toFixed(2) : '—'}</td>
+                    <td class="py-2 px-3 text-center font-mono text-slate-600">${absErr !== null ? absErr.toFixed(2) : '—'}</td>
+                    <td class="py-2 px-3 text-center bg-blue-50/40">
+                        <input type="number" step="0.05" min="0" max="24" value="${row.delay.toFixed(2)}"
+                            onchange="updateRowValue(${i}, 'delay', this.value)"
+                            class="editable-cell w-20 text-center font-bold text-slate-900 bg-white border border-dashed border-aje-red/60 rounded px-1.5 py-1">
+                    </td>
+                    <td class="py-2 px-3 text-center">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${isGoalMet ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+                            ${isGoalMet ? 'Meta TO BE' : 'En mejora'}
+                        </span>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Fila Semana 13 (Pronóstico)
+            const s13Tr = document.createElement('tr');
+            s13Tr.className = 'bg-amber-50/60 font-semibold text-slate-800';
+            s13Tr.innerHTML = `
+                <td class="py-2.5 px-3 text-center font-bold text-aje-navy">Sem 13</td>
+                <td class="py-2.5 px-4 text-slate-700">Proyección siguiente periodo (Pronóstico)</td>
+                <td class="py-2.5 px-3 text-center text-slate-400">—</td>
+                <td class="py-2.5 px-3 text-center font-extrabold text-aje-red">${activeRes.preds[12].toFixed(2)}%</td>
+                <td colspan="3" class="py-2.5 px-3 text-center text-xs text-slate-500">Proyección proyectada según modelo activo</td>
+                <td class="py-2.5 px-3 text-center text-emerald-700 font-bold">&lt; 0.40 h</td>
+                <td class="py-2.5 px-3 text-center">
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">Sostenible</span>
+                </td>
+            `;
+            tbody.appendChild(s13Tr);
+
+            document.getElementById('footEcm').textContent = activeRes.ecm.toFixed(2);
+            document.getElementById('footDam').textContent = activeRes.dam.toFixed(2) + '%';
+
+            // Actualizar gráficos
+            updateCharts(activeRes.preds, currentFleet, currentOtif, currentCost, adoption);
+        }
+
+        function initCharts() {
+            const labels13 = [...Array(12)].map((_, i) => `Sem ${i + 1}`).concat(['Sem 13 (Pron.)']);
+            const labels12 = [...Array(12)].map((_, i) => `Sem ${i + 1}`);
+
+            // Gráfico 1: Proyección OTIF
+            otifChart = new Chart(document.getElementById('otifChart'), {
+                type: 'line',
+                data: {
+                    labels: labels13,
+                    datasets: [
+                        {
+                            label: 'OTIF Real / Simulado (%)',
+                            data: [],
+                            borderColor: '#0B2A5B',
+                            backgroundColor: 'rgba(11, 42, 91, 0.08)',
+                            borderWidth: 3,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#0B2A5B',
+                            tension: 0.2,
+                            fill: true
+                        },
+                        {
+                            label: 'Modelo Pronóstico Activo',
+                            data: [],
+                            borderColor: '#F26B21',
+                            backgroundColor: '#F26B21',
+                            borderWidth: 2.5,
+                            borderDash: [6, 4],
+                            pointRadius: 4,
+                            tension: 0
+                        },
+                        {
+                            label: 'Meta T2 (92.0%)',
+                            data: Array(13).fill(92),
+                            borderColor: '#059669',
+                            borderWidth: 2,
+                            borderDash: [3, 3],
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } }
+                    },
+                    scales: {
+                        y: {
+                            min: 74,
+                            max: 96,
+                            ticks: { callback: v => v + '%' },
+                            grid: { color: '#E2E8F0' }
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // Gráfico 2: Comparativa AS IS vs TO BE
+            scenarioChart = new Chart(document.getElementById('scenarioChart'), {
+                type: 'bar',
+                data: {
+                    labels: ['Ocupación Flota (%)', 'Nivel OTIF (%)', 'Eficiencia Costo (%)'],
+                    datasets: [
+                        {
+                            label: 'Escenario Actual (AS IS)',
+                            data: [72.5, 80.0, 90.0], // 90% eficiencia = 10% costo logístico
+                            backgroundColor: '#94A3B8',
+                            borderRadius: 6
+                        },
+                        {
+                            label: 'Escenario Seleccionado',
+                            data: [91.5, 92.0, 91.5], // 91.5% eficiencia = 8.5% costo logístico
+                            backgroundColor: '#D32F2F',
+                            borderRadius: 6
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    if (ctx.dataIndex === 2) {
+                                        const costPct = (100 - ctx.raw).toFixed(2);
+                                        return `${ctx.dataset.label}: ${ctx.raw.toFixed(1)}% (Costo logístico: ${costPct}%)`;
+                                    }
+                                    return `${ctx.dataset.label}: ${ctx.raw.toFixed(1)}%`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            min: 60,
+                            max: 100,
+                            ticks: { callback: v => v + '%' },
+                            grid: { color: '#E2E8F0' }
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // Gráfico 3: Evolución de Reducción de Retrasos
+            delayChart = new Chart(document.getElementById('delayChart'), {
+                type: 'bar',
+                data: {
+                    labels: labels12,
+                    datasets: [
+                        {
+                            label: 'Retraso en Despacho (horas)',
+                            data: [],
+                            backgroundColor: '#0B2A5B',
+                            borderRadius: 5,
+                            order: 2
+                        },
+                        {
+                            type: 'line',
+                            label: 'Meta Máxima (< 0.50 h)',
+                            data: Array(12).fill(0.5),
+                            borderColor: '#D32F2F',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            order: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 5.0,
+                            ticks: { callback: v => v + ' h' },
+                            grid: { color: '#E2E8F0' }
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        function updateCharts(forecastPreds, currentFleet, currentOtif, currentCost, adoption) {
+            if (!otifChart) return;
+
+            // Gráfico 1
+            otifChart.data.datasets[0].data = [...stateData.map(d => d.otif), null];
+            otifChart.data.datasets[1].data = forecastPreds;
+            otifChart.update();
+
+            // Gráfico 2
+            const costEfficiency = 100 - currentCost; // 90.0% en AS IS -> 91.5% en TO BE
+            scenarioChart.data.datasets[1].label = adoption === 1
+                ? 'Escenario Mejorado (TO BE)'
+                : (adoption === 0.5 ? 'Escenario Intermedio (50%)' : 'Escenario Actual (0%)');
+            scenarioChart.data.datasets[1].data = [currentFleet, currentOtif, costEfficiency];
+            scenarioChart.update();
+
+            // Gráfico 3
+            delayChart.data.datasets[0].data = stateData.map(d => d.delay);
+            delayChart.update();
+        }
+    </script>
+</body>
+</html>
